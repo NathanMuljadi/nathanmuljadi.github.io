@@ -1,8 +1,11 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    />
     <title>DataViz Final Project</title>
     <!-- Include D3 -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -11,7 +14,6 @@
         font-family: sans-serif;
         margin: 20px;
       }
-      /* Shared axis styling */
       .axis text {
         font-size: 12px;
       }
@@ -21,14 +23,27 @@
         stroke: #000;
         shape-rendering: crispEdges;
       }
-      /* Bar chart style */
       .bar {
         fill: steelblue;
       }
       .bar:hover {
         fill: darkorange;
       }
-      /* Tooltip styling */
+      .treemap-node {
+        cursor: pointer;
+      }
+      .treemap-node rect {
+        stroke: #fff;
+      }
+      .treemap-node:hover rect {
+        stroke: #000;
+        stroke-width: 2;
+      }
+      .treemap-label {
+        pointer-events: none;
+        font-size: 12px;
+        fill: #000;
+      }
       .tooltip {
         position: absolute;
         background-color: lightgrey;
@@ -39,16 +54,13 @@
         opacity: 0;
         font-size: 12px;
       }
-      /* Legend styling */
       .legend rect {
         stroke: #000;
         stroke-width: 1;
       }
-      /* Cursor for bubbles */
       .node circle {
         cursor: pointer;
       }
-      /* Separator styling */
       .separator {
         border-top: 1px solid black;
         margin: 50px 0;
@@ -59,404 +71,505 @@
     <h1>Hate Crimes in San Francisco</h1>
     <h1>Nathan Muljadi</h1>
     <h2>
-      Although San Francisco is considered diverse and judgement-free, the amount of 
-      hate crimes that occur in San Francisco is still fairly high, despite its reputation. 
-      The visualizations shown here will clear up this stigma.
+      Although San Francisco is considered diverse and
+      judgement-free, the amount of hate crimes that occur
+      in San Francisco is still fairly high, despite its
+      reputation. The visualizations shown here will clear
+      up this stigma.
     </h2>
-    
-    <!-- Chart 1: Total Victims by Suspect Race -->
+
+    <!-- Chart 1: Total Victims by Suspect Race (Horizontal) -->
     <div id="chart1"></div>
     <hr class="separator" />
-    
-    <!-- Chart 2: Total Victims by Bias Type -->
-    <div id="chart2"></div>
+
+    <!-- Chart 2: Treemap of Victims by Bias Type -->
+    <div id="chart2" style="position: relative"></div>
+    <div class="tooltip" id="tooltip2"></div>
     <hr class="separator" />
-    
-    <!-- Chart 3: Bubble Chart (No Labels & Non-zero Suspects) -->
+
+    <!-- Chart 3: Bubble Chart (No Labels & Non-zero Suspects, "Other" grouping) -->
     <div id="chart3"></div>
     <div class="tooltip" id="tooltip3"></div>
     <hr class="separator" />
-    
+
     <!-- Chart 4: Total Victims per Year (Area Chart) -->
     <div id="chart4"></div>
-    
-    <!-- Script for Chart 1: Total Victims by Suspect Race -->
+
+    <!-- Script for Chart 1 -->
     <script>
-      (function() {
-        const margin = {top: 50, right: 30, bottom: 180, left: 80};
-        const width = 1300 - margin.left - margin.right;
-        const height = 700 - margin.top - margin.bottom;
-  
-        const svg = d3.select("#chart1")
-          .append("svg")
-          .attr("width", width + margin.left + margin.right)
-          .attr("height", height + margin.top + margin.bottom)
-          .append("g")
-          .attr("transform", `translate(${margin.left},${margin.top})`);
-  
-        d3.csv("PD-Investigated-Hate-Crimes.csv", function(d) {
-          return {
-            race: d.suspects_race_as_a_group,
-            victims: +d.total_number_of_individual_victims
-          };
-        }).then(function(data) {
-          // Aggregate data by race and sum victims
-          const aggregatedData = d3.rollups(
-            data,
-            v => d3.sum(v, d => d.victims),
-            d => d.race
+      (function () {
+        const margin = {
+            top: 50,
+            right: 100,
+            bottom: 80,
+            left: 200,
+          },
+          width = 1300 - margin.left - margin.right,
+          height = 700 - margin.top - margin.bottom;
+        const svg = d3
+          .select('#chart1')
+          .append('svg')
+          .attr('width', width + margin.left + margin.right)
+          .attr(
+            'height',
+            height + margin.top + margin.bottom,
+          )
+          .append('g')
+          .attr(
+            'transform',
+            `translate(${margin.left},${margin.top})`,
           );
-          let aggregatedArray = aggregatedData.map(([race, totalVictims]) => ({ race, totalVictims }));
-          aggregatedArray.sort((a, b) => d3.descending(a.totalVictims, b.totalVictims));
-          // Remove the three races with the smallest victim totals
-          aggregatedArray = aggregatedArray.slice(0, aggregatedArray.length - 3);
-  
-          const x = d3.scaleBand()
-                      .domain(aggregatedArray.map(d => d.race))
-                      .range([0, width])
-                      .padding(0.1);
-          const y = d3.scaleLinear()
-                      .domain([0, d3.max(aggregatedArray, d => d.totalVictims)])
-                      .nice()
-                      .range([height, 0]);
-  
-          svg.append("g")
-             .attr("class", "x axis")
-             .attr("transform", `translate(0, ${height})`)
-             .call(d3.axisBottom(x))
-             .selectAll("text")
-             .attr("transform", "rotate(-45)")
-             .attr("dx", "-0.8em")
-             .attr("dy", "0.15em")
-             .style("text-anchor", "end");
-  
-          svg.append("g")
-             .attr("class", "y axis")
-             .call(d3.axisLeft(y));
-  
-          svg.selectAll(".bar")
-             .data(aggregatedArray)
-             .enter().append("rect")
-             .attr("class", "bar")
-             .attr("x", d => x(d.race))
-             .attr("width", x.bandwidth())
-             .attr("y", d => y(d.totalVictims))
-             .attr("height", d => height - y(d.totalVictims));
-  
-          svg.append("text")
-             .attr("x", width / 2)
-             .attr("y", -20)
-             .attr("text-anchor", "middle")
-             .style("font-size", "20px")
-             .text("Total Number of Victims by Suspect Race");
-  
-          svg.append("text")
-             .attr("transform", "rotate(-90)")
-             .attr("y", -margin.left + 20)
-             .attr("x", -(height / 2))
-             .attr("dy", "1em")
-             .style("text-anchor", "middle")
-             .text("Total Number of Victims");
-  
-          svg.append("text")
-             .attr("x", width / 2)
-             .attr("y", height + margin.bottom - 40)
-             .attr("text-anchor", "middle")
-             .style("font-size", "16px")
-             .text("Suspect Race");
-        })
-        .catch(function(error) {
-          console.error("Error loading or processing data:", error);
+        d3.csv('PD-Investigated-Hate-Crimes.csv', (d) => ({
+          race: d.suspects_race_as_a_group,
+          victims: +d.total_number_of_individual_victims,
+        })).then((data) => {
+          const rolled = d3.rollups(
+            data,
+            (v) => d3.sum(v, (d) => d.victims),
+            (d) => d.race,
+          );
+          let arr = rolled.map(([race, total]) => ({
+            race,
+            total,
+          }));
+          arr.sort((a, b) =>
+            d3.descending(a.total, b.total),
+          );
+          arr = arr.slice(0, arr.length - 3);
+          const x = d3
+            .scaleLinear()
+            .domain([0, d3.max(arr, (d) => d.total)])
+            .nice()
+            .range([0, width]);
+          const y = d3
+            .scaleBand()
+            .domain(arr.map((d) => d.race))
+            .range([0, height])
+            .padding(0.1);
+          svg
+            .append('g')
+            .attr('transform', `translate(0,${height})`)
+            .call(d3.axisBottom(x));
+          svg.append('g').call(d3.axisLeft(y));
+          svg
+            .selectAll('.bar')
+            .data(arr)
+            .enter()
+            .append('rect')
+            .attr('class', 'bar')
+            .attr('y', (d) => y(d.race))
+            .attr('height', y.bandwidth())
+            .attr('x', 0)
+            .attr('width', (d) => x(d.total));
+          svg
+            .append('text')
+            .attr('x', width / 2)
+            .attr('y', -20)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '20px')
+            .text(
+              'Total Number of Victims by Suspect Race',
+            );
+          svg
+            .append('text')
+            .attr('x', width / 2)
+            .attr('y', height + margin.bottom - 20)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '16px')
+            .text('Total Number of Victims');
+          svg
+            .append('text')
+            .attr('transform', 'rotate(-90)')
+            .attr('x', -height / 2)
+            .attr('y', -margin.left + 40)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '16px')
+            .text('Suspect Race');
         });
       })();
     </script>
-    
-    <!-- Script for Chart 2: Total Victims by Bias Type -->
+
+    <!-- Script for Chart 2 -->
     <script>
-      (function() {
-        const margin = {top: 50, right: 30, bottom: 180, left: 80};
-        const width = 1300 - margin.left - margin.right;
-        const height = 700 - margin.top - margin.bottom;
-  
-        const svg = d3.select("#chart2")
-          .append("svg")
-          .attr("width", width + margin.left + margin.right)
-          .attr("height", height + margin.top + margin.bottom)
-          .append("g")
-          .attr("transform", `translate(${margin.left},${margin.top})`);
-  
-        d3.csv("PD-Investigated-Hate-Crimes.csv", function(d) {
-          return {
-            bias: d.most_serious_bias_type,
-            victims: +d.total_number_of_individual_victims
-          };
-        }).then(function(data) {
-          const aggregatedData = d3.rollups(
-            data,
-            v => d3.sum(v, d => d.victims),
-            d => d.bias
+      (function () {
+        const margin = {
+            top: 50,
+            right: 30,
+            bottom: 50,
+            left: 30,
+          },
+          width = 1300 - margin.left - margin.right,
+          height = 700 - margin.top - margin.bottom;
+        const svg = d3
+          .select('#chart2')
+          .append('svg')
+          .attr('width', width + margin.left + margin.right)
+          .attr(
+            'height',
+            height + margin.top + margin.bottom,
+          )
+          .append('g')
+          .attr(
+            'transform',
+            `translate(${margin.left},${margin.top})`,
           );
-          let aggregatedArray = aggregatedData.map(([bias, totalVictims]) => ({ bias, totalVictims }));
-          aggregatedArray.sort((a, b) => d3.descending(a.totalVictims, b.totalVictims));
-  
-          const x = d3.scaleBand()
-                      .domain(aggregatedArray.map(d => d.bias))
-                      .range([0, width])
-                      .padding(0.1);
-          const y = d3.scaleLinear()
-                      .domain([0, d3.max(aggregatedArray, d => d.totalVictims)])
-                      .nice()
-                      .range([height, 0]);
-  
-          svg.append("g")
-             .attr("class", "x axis")
-             .attr("transform", `translate(0, ${height})`)
-             .call(d3.axisBottom(x))
-             .selectAll("text")
-             .attr("transform", "rotate(-45)")
-             .attr("dx", "-0.8em")
-             .attr("dy", "0.15em")
-             .style("text-anchor", "end");
-  
-          svg.append("g")
-             .attr("class", "y axis")
-             .call(d3.axisLeft(y));
-  
-          svg.selectAll(".bar")
-             .data(aggregatedArray)
-             .enter().append("rect")
-             .attr("class", "bar")
-             .attr("x", d => x(d.bias))
-             .attr("width", x.bandwidth())
-             .attr("y", d => y(d.totalVictims))
-             .attr("height", d => height - y(d.totalVictims));
-  
-          svg.append("text")
-             .attr("x", width / 2)
-             .attr("y", -20)
-             .attr("text-anchor", "middle")
-             .style("font-size", "20px")
-             .text("Total Number of Victims by Bias Type");
-  
-          svg.append("text")
-             .attr("transform", "rotate(-90)")
-             .attr("y", -margin.left + 20)
-             .attr("x", -(height / 2))
-             .attr("dy", "1em")
-             .style("text-anchor", "middle")
-             .text("Total Number of Victims");
-  
-          svg.append("text")
-             .attr("x", width / 2)
-             .attr("y", height + margin.bottom - 40)
-             .attr("text-anchor", "middle")
-             .style("font-size", "16px")
-             .text("Most Serious Bias Type");
-        })
-        .catch(function(error) {
-          console.error("Error loading or processing data:", error);
-        });
-      })();
-    </script>
-    
-    <!-- Script for Chart 3: Bubble Chart (No Labels & Non-zero Suspects) -->
-    <script>
-      (function() {
-        const margin = {top: 50, right: 250, bottom: 100, left: 80};
-        const width = 1000;
-        const height = 700;
-        const totalWidth = width + margin.left + margin.right;
-        const totalHeight = height + margin.top + margin.bottom;
-  
-        const svg = d3.select("#chart3")
-          .append("svg")
-          .attr("width", totalWidth)
-          .attr("height", totalHeight);
-  
-        const chartGroup = svg.append("g")
-          .attr("transform", `translate(${margin.left},${margin.top})`);
-  
-        const tooltip = d3.select("#tooltip3");
-  
-        d3.csv("PD-Investigated-Hate-Crimes.csv", function(d) {
-          return {
-            race: d.suspects_race_as_a_group,
-            offensive_act: d.offensive_act,
-            totalSuspects: +d.total_number_of_suspects
-          };
-        }).then(function(data) {
-          const aggregatedDataNested = d3.rollups(
+        const tooltip = d3.select('#tooltip2');
+        d3.csv('PD-Investigated-Hate-Crimes.csv', (d) => ({
+          bias: d.most_serious_bias_type,
+          victims: +d.total_number_of_individual_victims,
+        })).then((data) => {
+          const rolled = d3.rollups(
             data,
-            v => d3.sum(v, d => d.totalSuspects),
-            d => d.offensive_act,
-            d => d.race
+            (v) => d3.sum(v, (d) => d.victims),
+            (d) => d.bias,
           );
-          let aggregatedArray = [];
-          aggregatedDataNested.forEach(([offensive_act, raceArray]) => {
-            raceArray.forEach(([race, totalSuspects]) => {
-              aggregatedArray.push({ offensive_act, race, totalSuspects });
+          const items = rolled.map(([name, value]) => ({
+            name,
+            value,
+          }));
+          const total = d3.sum(items, (d) => d.value);
+          // Title
+          svg
+            .append('text')
+            .attr('x', width / 2)
+            .attr('y', -20)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '20px')
+            .text(
+              'Total Number of Victims Due to Bias Types',
+            );
+          svg
+            .append('text')
+            .attr('x', width / 2)
+            .attr('y', -5)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '14px')
+            .text(`Total Victims: ${total}`);
+          // Treemap
+          const root = d3
+            .hierarchy({ children: items })
+            .sum((d) => d.value)
+            .sort((a, b) => b.value - a.value);
+          d3
+            .treemap()
+            .size([width, height])
+            .paddingInner(1)(root);
+          const color = d3
+            .scaleOrdinal()
+            .domain(items.map((d) => d.name))
+            .range(d3.schemeCategory10);
+          const node = svg
+            .selectAll('.treemap-node')
+            .data(root.leaves())
+            .enter()
+            .append('g')
+            .attr('class', 'treemap-node')
+            .attr(
+              'transform',
+              (d) => `translate(${d.x0},${d.y0})`,
+            )
+            .on('mouseover', (e, d) => {
+              d3.select(e.currentTarget)
+                .select('rect')
+                .attr('stroke', '#000')
+                .attr('stroke-width', 2);
+              tooltip
+                .transition()
+                .duration(200)
+                .style('opacity', 0.9);
+              tooltip
+                .html(
+                  `<strong>Bias:</strong> ${d.data.name}<br/><strong>Victims:</strong> ${d.value}`,
+                )
+                .style('left', e.pageX + 10 + 'px')
+                .style('top', e.pageY - 28 + 'px');
+            })
+            .on('mouseout', (e, d) => {
+              d3.select(e.currentTarget)
+                .select('rect')
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 1);
+              tooltip
+                .transition()
+                .duration(200)
+                .style('opacity', 0);
             });
-          });
-          aggregatedArray = aggregatedArray.filter(d => d.totalSuspects > 0);
-  
-          const radiusScale = d3.scaleSqrt()
-            .domain([0, d3.max(aggregatedArray, d => d.totalSuspects)])
+          node
+            .append('rect')
+            .attr('width', (d) => d.x1 - d.x0)
+            .attr('height', (d) => d.y1 - d.y0)
+            .attr('fill', (d) => color(d.data.name));
+          node
+            .append('text')
+            .attr('class', 'treemap-label')
+            .selectAll('tspan')
+            .data((d) => d.data.name.split(/\s+/))
+            .enter()
+            .append('tspan')
+            .attr('x', 4)
+            .attr('y', (_, i) => 15 + i * 12)
+            .text((d) => d);
+        });
+      })();
+    </script>
+
+    <!-- Script for Chart 3 -->
+    <script>
+      (function () {
+        const margin = {
+            top: 50,
+            right: 250,
+            bottom: 100,
+            left: 80,
+          },
+          width = 1000,
+          height = 700;
+        const svg = d3
+          .select('#chart3')
+          .append('svg')
+          .attr('width', width + margin.left + margin.right)
+          .attr(
+            'height',
+            height + margin.top + margin.bottom,
+          );
+        const chartGroup = svg
+          .append('g')
+          .attr(
+            'transform',
+            `translate(${margin.left},${margin.top})`,
+          );
+        const tooltip = d3.select('#tooltip3');
+        d3.csv('PD-Investigated-Hate-Crimes.csv', (d) => {
+          let race = d.suspects_race_as_a_group;
+          if (
+            [
+              'East Indian/Asian Indian',
+              'East Indian',
+              'American Indian or Alaska Native',
+            ].includes(race)
+          )
+            race = 'Other';
+          return {
+            race,
+            act: d.offensive_act,
+            total: +d.total_number_of_suspects,
+          };
+        }).then((data) => {
+          const nested = d3.rollups(
+            data,
+            (v) => d3.sum(v, (d) => d.total),
+            (d) => d.act,
+            (d) => d.race,
+          );
+          let arr = [];
+          nested.forEach(([act, rs]) =>
+            rs.forEach(([r, t]) => {
+              if (t > 0) arr.push({ act, r, total: t });
+            }),
+          );
+          const sumTotal = d3.sum(arr, (d) => d.total);
+          // Title
+          chartGroup
+            .append('text')
+            .attr('x', width / 2)
+            .attr('y', -20)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '20px')
+            .text('Types of Offensive Acts');
+          chartGroup
+            .append('text')
+            .attr('x', width / 2)
+            .attr('y', -5)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '14px')
+            .text(`Total Suspects: ${sumTotal}`);
+          const radius = d3
+            .scaleSqrt()
+            .domain([0, d3.max(arr, (d) => d.total)])
             .range([10, 50]);
-  
-          const races = Array.from(new Set(aggregatedArray.map(d => d.race)));
-          const colorScale = d3.scaleOrdinal()
+          const races = Array.from(
+            new Set(arr.map((d) => d.r)),
+          );
+          const color = d3
+            .scaleOrdinal()
             .domain(races)
             .range(d3.schemeCategory10);
-  
-          const simulation = d3.forceSimulation(aggregatedArray)
-            .force("charge", d3.forceManyBody().strength(5))
-            .force("center", d3.forceCenter(width / 2, height / 2))
-            .force("collision", d3.forceCollide(d => radiusScale(d.totalSuspects) + 2))
-            .on("tick", ticked);
-  
-          const nodes = chartGroup.selectAll(".node")
-            .data(aggregatedArray)
+          d3.forceSimulation(arr)
+            .force('charge', d3.forceManyBody().strength(5))
+            .force(
+              'center',
+              d3.forceCenter(width / 2, height / 2),
+            )
+            .force(
+              'collision',
+              d3.forceCollide((d) => radius(d.total) + 2),
+            )
+            .on('tick', () =>
+              chartGroup
+                .selectAll('.node')
+                .attr(
+                  'transform',
+                  (d) => `translate(${d.x},${d.y})`,
+                ),
+            );
+          const nodes = chartGroup
+            .selectAll('.node')
+            .data(arr)
             .enter()
-            .append("g")
-            .attr("class", "node")
-            .on("mouseover", function(event, d) {
-              d3.select(this).select("circle")
-                .attr("stroke", "black")
-                .attr("stroke-width", 2);
-              tooltip.transition()
+            .append('g')
+            .attr('class', 'node')
+            .on('mouseover', (e, d) => {
+              d3.select(e.currentTarget)
+                .select('circle')
+                .attr('stroke', '#000')
+                .attr('stroke-width', 2);
+              tooltip
+                .transition()
                 .duration(200)
-                .style("opacity", 0.9);
-              tooltip.html(
-                `<strong>Offensive Act:</strong> ${d.offensive_act}<br/>` +
-                `<strong>Race:</strong> ${d.race}<br/>` +
-                `<strong>Total Suspects:</strong> ${d.totalSuspects}`
-              )
-              .style("left", (event.pageX + 10) + "px")
-              .style("top", (event.pageY - 28) + "px");
+                .style('opacity', 0.9);
+              tooltip
+                .html(
+                  `<strong>Offensive Act:</strong> ${d.act}<br/><strong>Race:</strong> ${d.r}<br/><strong>Total Suspects:</strong> ${d.total}`,
+                )
+                .style('left', e.pageX + 10 + 'px')
+                .style('top', e.pageY - 28 + 'px');
             })
-            .on("mouseout", function(event, d) {
-              d3.select(this).select("circle")
-                .attr("stroke", null);
-              tooltip.transition()
-                .duration(500)
-                .style("opacity", 0);
+            .on('mouseout', (e, d) => {
+              d3.select(e.currentTarget)
+                .select('circle')
+                .attr('stroke', null);
+              tooltip
+                .transition()
+                .duration(200)
+                .style('opacity', 0);
             });
-  
-          nodes.append("circle")
-            .attr("r", d => radiusScale(d.totalSuspects))
-            .attr("fill", d => colorScale(d.race));
-  
-          function ticked() {
-            nodes.attr("transform", d => `translate(${d.x},${d.y})`);
-          }
-  
-          const legend = svg.append("g")
-            .attr("class", "legend")
-            .attr("transform", `translate(${width + margin.left - 20}, ${margin.top})`);
-  
-          const legendItemSize = 20;
-          const legendSpacing = 5;
-  
+          nodes
+            .append('circle')
+            .attr('r', (d) => radius(d.total))
+            .attr('fill', (d) => color(d.r));
+          const legend = svg
+            .append('g')
+            .attr(
+              'transform',
+              `translate(${width + margin.left - 20},${margin.top})`,
+            );
           races.forEach((r, i) => {
-            const legendRow = legend.append("g")
-              .attr("transform", `translate(0, ${i * (legendItemSize + legendSpacing)})`);
-            legendRow.append("rect")
-              .attr("width", legendItemSize)
-              .attr("height", legendItemSize)
-              .attr("fill", colorScale(r));
-            legendRow.append("text")
-              .attr("x", legendItemSize + legendSpacing)
-              .attr("y", legendItemSize / 2)
-              .attr("dy", "0.35em")
+            const row = legend
+              .append('g')
+              .attr('transform', `translate(0,${i * 25})`);
+            row
+              .append('rect')
+              .attr('width', 20)
+              .attr('height', 20)
+              .attr('fill', color(r));
+            row
+              .append('text')
+              .attr('x', 25)
+              .attr('y', 10)
+              .attr('dy', '0.35em')
               .text(r);
           });
-        }).catch(function(error) {
-          console.error("Error loading or processing data:", error);
         });
       })();
     </script>
-    
-    <!-- Script for Chart 4: Area Chart -->
+
+    <!-- Script for Chart 4 -->
     <script>
-      (function() {
-        const margin = {top: 50, right: 50, bottom: 50, left: 70};
-        const width = 1000 - margin.left - margin.right;
-        const height = 500 - margin.top - margin.bottom;
-  
-        const svg = d3.select("#chart4")
-          .append("svg")
-          .attr("width", width + margin.left + margin.right)
-          .attr("height", height + margin.top + margin.bottom)
-          .append("g")
-          .attr("transform", `translate(${margin.left}, ${margin.top})`);
-  
-        const parseTime = d3.timeParse("%Y/%m/%d");
-  
-        d3.csv("PD-Investigated-Hate-Crimes.csv", function(d) {
-          return {
-            occurence_date: parseTime(d.occurence_month),
-            totalVictims: +d.total_number_of_individual_victims
-          };
-        }).then(function(data) {
-          const aggregatedData = d3.rollups(
-            data,
-            v => d3.sum(v, d => d.totalVictims),
-            d => d.occurence_date.getFullYear()
+      (function () {
+        const margin = {
+            top: 50,
+            right: 50,
+            bottom: 50,
+            left: 70,
+          },
+          width = 1000 - margin.left - margin.right,
+          height = 500 - margin.top - margin.bottom;
+        const svg = d3
+          .select('#chart4')
+          .append('svg')
+          .attr('width', width + margin.left + margin.right)
+          .attr(
+            'height',
+            height + margin.top + margin.bottom,
+          )
+          .append('g')
+          .attr(
+            'transform',
+            `translate(${margin.left},${margin.top})`,
           );
-  
-          let aggregatedArray = aggregatedData.map(([year, total]) => ({
-            year: new Date(year, 0, 1),
-            totalVictims: total
+        const parse = d3.timeParse('%Y/%m/%d');
+        d3.csv('PD-Investigated-Hate-Crimes.csv', (d) => ({
+          date: parse(d.occurence_month),
+          victims: +d.total_number_of_individual_victims,
+        })).then((data) => {
+          const rolled = d3.rollups(
+            data,
+            (v) => d3.sum(v, (d) => d.victims),
+            (d) => d.date.getFullYear(),
+          );
+          let arr = rolled.map(([y, total]) => ({
+            year: new Date(y, 0, 1),
+            total: total,
           }));
-          aggregatedArray.sort((a, b) => a.year - b.year);
-  
-          const x = d3.scaleTime()
-            .domain(d3.extent(aggregatedArray, d => d.year))
+          arr.sort((a, b) => a.year - b.year);
+          const overall = d3.sum(arr, (d) => d.total);
+          svg
+            .append('text')
+            .attr('x', width / 2)
+            .attr('y', -20)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '20px')
+            .text('Number of Victims throughout the Years');
+          svg
+            .append('text')
+            .attr('x', width / 2)
+            .attr('y', -5)
+            .attr('text-anchor', 'middle')
+            .style('font-size', '14px')
+            .text(`Total Victims: ${overall}`);
+          const x = d3
+            .scaleTime()
+            .domain(d3.extent(arr, (d) => d.year))
             .range([0, width]);
-  
-          const y = d3.scaleLinear()
-            .domain([0, d3.max(aggregatedArray, d => d.totalVictims)])
+          const y = d3
+            .scaleLinear()
+            .domain([0, d3.max(arr, (d) => d.total)])
             .nice()
             .range([height, 0]);
-  
-          const area = d3.area()
-            .x(d => x(d.year))
+          const area = d3
+            .area()
+            .x((d) => x(d.year))
             .y0(height)
-            .y1(d => y(d.totalVictims))
+            .y1((d) => y(d.total))
             .curve(d3.curveMonotoneX);
-  
-          svg.append("path")
-            .datum(aggregatedArray)
-            .attr("fill", "steelblue")
-            .attr("opacity", 0.7)
-            .attr("d", area);
-  
-          svg.append("g")
-            .attr("class", "x axis")
-            .attr("transform", `translate(0, ${height})`)
-            .call(d3.axisBottom(x).ticks(d3.timeYear.every(1)));
-  
-          svg.append("g")
-            .attr("class", "y axis")
-            .call(d3.axisLeft(y));
-  
-          svg.append("text")
-            .attr("x", width / 2)
-            .attr("y", height + margin.bottom - 10)
-            .attr("text-anchor", "middle")
-            .text("Year");
-  
-          svg.append("text")
-            .attr("transform", "rotate(-90)")
-            .attr("x", -height / 2)
-            .attr("y", -margin.left + 15)
-            .attr("text-anchor", "middle")
-            .text("Total Number of Victims");
-        }).catch(function(error) {
-          console.error("Error loading or processing data:", error);
+          svg
+            .append('path')
+            .datum(arr)
+            .attr('fill', 'steelblue')
+            .attr('opacity', 0.7)
+            .attr('d', area);
+          svg
+            .append('g')
+            .attr('transform', `translate(0,${height})`)
+            .call(
+              d3.axisBottom(x).ticks(d3.timeYear.every(1)),
+            );
+          svg.append('g').call(d3.axisLeft(y));
+          svg
+            .append('text')
+            .attr('x', width / 2)
+            .attr('y', height + margin.bottom - 10)
+            .attr('text-anchor', 'middle')
+            .text('Year');
+          svg
+            .append('text')
+            .attr('transform', 'rotate(-90)')
+            .attr('x', -height / 2)
+            .attr('y', -margin.left + 15)
+            .attr('text-anchor', 'middle')
+            .text('Total Number of Victims');
         });
       })();
     </script>
-    
   </body>
 </html>

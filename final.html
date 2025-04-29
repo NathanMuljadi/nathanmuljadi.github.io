@@ -80,6 +80,7 @@
 
     <!-- Chart 1: Total Victims by Suspect Race (Horizontal) -->
     <div id="chart1"></div>
+    <div class="tooltip" id="tooltip1"></div>
     <hr class="separator" />
 
     <!-- Chart 2: Treemap of Victims by Bias Type -->
@@ -106,6 +107,7 @@
           },
           width = 1300 - margin.left - margin.right,
           height = 700 - margin.top - margin.bottom;
+
         const svg = d3
           .select('#chart1')
           .append('svg')
@@ -119,13 +121,16 @@
             'transform',
             `translate(${margin.left},${margin.top})`,
           );
+
+        const tooltip1 = d3.select('#tooltip1');
+
         d3.csv('PD-Investigated-Hate-Crimes.csv', (d) => ({
           race: d.suspects_race_as_a_group,
-          victims: +d.total_number_of_individual_victims,
+          total: +d.total_number_of_individual_victims,
         })).then((data) => {
           const rolled = d3.rollups(
             data,
-            (v) => d3.sum(v, (d) => d.victims),
+            (v) => d3.sum(v, (d) => d.total),
             (d) => d.race,
           );
           let arr = rolled.map(([race, total]) => ({
@@ -136,21 +141,26 @@
             d3.descending(a.total, b.total),
           );
           arr = arr.slice(0, arr.length - 3);
+
           const x = d3
             .scaleLinear()
             .domain([0, d3.max(arr, (d) => d.total)])
             .nice()
             .range([0, width]);
+
           const y = d3
             .scaleBand()
             .domain(arr.map((d) => d.race))
             .range([0, height])
             .padding(0.1);
+
           svg
             .append('g')
             .attr('transform', `translate(0,${height})`)
             .call(d3.axisBottom(x));
+
           svg.append('g').call(d3.axisLeft(y));
+
           svg
             .selectAll('.bar')
             .data(arr)
@@ -160,16 +170,45 @@
             .attr('y', (d) => y(d.race))
             .attr('height', y.bandwidth())
             .attr('x', 0)
-            .attr('width', (d) => x(d.total));
+            .attr('width', (d) => x(d.total))
+            .on('mouseover', (event, d) => {
+              d3.select(event.currentTarget).attr(
+                'fill',
+                'darkorange',
+              );
+              tooltip1
+                .transition()
+                .duration(200)
+                .style('opacity', 0.9);
+              tooltip1
+                .html(
+                  `<strong>Race:</strong> ${d.race}<br>` +
+                    `<strong>Victims:</strong> ${d.total}`,
+                )
+                .style('left', event.pageX + 10 + 'px')
+                .style('top', event.pageY - 28 + 'px');
+            })
+            .on('mouseout', (event, d) => {
+              d3.select(event.currentTarget).attr(
+                'fill',
+                'steelblue',
+              );
+              tooltip1
+                .transition()
+                .duration(200)
+                .style('opacity', 0);
+            });
+
           svg
             .append('text')
             .attr('x', width / 2)
             .attr('y', -20)
             .attr('text-anchor', 'middle')
-            .style('font-size', '20px')
+            .style('font-size', '32px')
             .text(
-              'Total Number of Victims by Suspect Race',
+              'Total Number of Victims by Suspect Race (2001 – 2025)',
             );
+
           svg
             .append('text')
             .attr('x', width / 2)
@@ -177,6 +216,7 @@
             .attr('text-anchor', 'middle')
             .style('font-size', '16px')
             .text('Total Number of Victims');
+
           svg
             .append('text')
             .attr('transform', 'rotate(-90)')
@@ -200,6 +240,7 @@
           },
           width = 1300 - margin.left - margin.right,
           height = 700 - margin.top - margin.bottom;
+
         const svg = d3
           .select('#chart2')
           .append('svg')
@@ -213,7 +254,9 @@
             'transform',
             `translate(${margin.left},${margin.top})`,
           );
+
         const tooltip = d3.select('#tooltip2');
+
         d3.csv('PD-Investigated-Hate-Crimes.csv', (d) => ({
           bias: d.most_serious_bias_type,
           victims: +d.total_number_of_individual_victims,
@@ -228,16 +271,17 @@
             value,
           }));
           const total = d3.sum(items, (d) => d.value);
-          // Title
+
           svg
             .append('text')
             .attr('x', width / 2)
             .attr('y', -20)
             .attr('text-anchor', 'middle')
-            .style('font-size', '20px')
+            .style('font-size', '32px')
             .text(
-              'Total Number of Victims Due to Bias Types',
+              'Total Number of Victims Due to Bias Types (2001 – 2025)',
             );
+
           svg
             .append('text')
             .attr('x', width / 2)
@@ -245,19 +289,22 @@
             .attr('text-anchor', 'middle')
             .style('font-size', '14px')
             .text(`Total Victims: ${total}`);
-          // Treemap
+
           const root = d3
             .hierarchy({ children: items })
             .sum((d) => d.value)
             .sort((a, b) => b.value - a.value);
+
           d3
             .treemap()
             .size([width, height])
             .paddingInner(1)(root);
+
           const color = d3
             .scaleOrdinal()
             .domain(items.map((d) => d.name))
             .range(d3.schemeCategory10);
+
           const node = svg
             .selectAll('.treemap-node')
             .data(root.leaves())
@@ -279,7 +326,8 @@
                 .style('opacity', 0.9);
               tooltip
                 .html(
-                  `<strong>Bias:</strong> ${d.data.name}<br/><strong>Victims:</strong> ${d.value}`,
+                  `<strong>Bias:</strong> ${d.data.name}<br>` +
+                    `<strong>Victims:</strong> ${d.value}`,
                 )
                 .style('left', e.pageX + 10 + 'px')
                 .style('top', e.pageY - 28 + 'px');
@@ -294,11 +342,13 @@
                 .duration(200)
                 .style('opacity', 0);
             });
+
           node
             .append('rect')
             .attr('width', (d) => d.x1 - d.x0)
             .attr('height', (d) => d.y1 - d.y0)
             .attr('fill', (d) => color(d.data.name));
+
           node
             .append('text')
             .attr('class', 'treemap-label')
@@ -308,7 +358,7 @@
             .append('tspan')
             .attr('x', 4)
             .attr('y', (_, i) => 15 + i * 12)
-            .text((d) => d);
+            .text((text) => text);
         });
       })();
     </script>
@@ -322,8 +372,9 @@
             bottom: 100,
             left: 80,
           },
-          width = 1000,
-          height = 700;
+          width = 1200,
+          height = 800;
+
         const svg = d3
           .select('#chart3')
           .append('svg')
@@ -332,13 +383,16 @@
             'height',
             height + margin.top + margin.bottom,
           );
+
         const chartGroup = svg
           .append('g')
           .attr(
             'transform',
             `translate(${margin.left},${margin.top})`,
           );
+
         const tooltip = d3.select('#tooltip3');
+
         d3.csv('PD-Investigated-Hate-Crimes.csv', (d) => {
           let race = d.suspects_race_as_a_group;
           if (
@@ -361,21 +415,24 @@
             (d) => d.act,
             (d) => d.race,
           );
+
           let arr = [];
           nested.forEach(([act, rs]) =>
             rs.forEach(([r, t]) => {
               if (t > 0) arr.push({ act, r, total: t });
             }),
           );
+
           const sumTotal = d3.sum(arr, (d) => d.total);
-          // Title
+
           chartGroup
             .append('text')
             .attr('x', width / 2)
             .attr('y', -20)
             .attr('text-anchor', 'middle')
-            .style('font-size', '20px')
-            .text('Types of Offensive Acts');
+            .style('font-size', '32px')
+            .text('Types of Offensive Acts (2001 – 2025)');
+
           chartGroup
             .append('text')
             .attr('x', width / 2)
@@ -383,10 +440,12 @@
             .attr('text-anchor', 'middle')
             .style('font-size', '14px')
             .text(`Total Suspects: ${sumTotal}`);
+
           const radius = d3
             .scaleSqrt()
             .domain([0, d3.max(arr, (d) => d.total)])
-            .range([10, 50]);
+            .range([20, 100]);
+
           const races = Array.from(
             new Set(arr.map((d) => d.r)),
           );
@@ -394,6 +453,7 @@
             .scaleOrdinal()
             .domain(races)
             .range(d3.schemeCategory10);
+
           d3.forceSimulation(arr)
             .force('charge', d3.forceManyBody().strength(5))
             .force(
@@ -412,6 +472,7 @@
                   (d) => `translate(${d.x},${d.y})`,
                 ),
             );
+
           const nodes = chartGroup
             .selectAll('.node')
             .data(arr)
@@ -429,7 +490,9 @@
                 .style('opacity', 0.9);
               tooltip
                 .html(
-                  `<strong>Offensive Act:</strong> ${d.act}<br/><strong>Race:</strong> ${d.r}<br/><strong>Total Suspects:</strong> ${d.total}`,
+                  `<strong>Offensive Act:</strong> ${d.act}<br>` +
+                    `<strong>Race:</strong> ${d.r}<br>` +
+                    `<strong>Total Suspects:</strong> ${d.total}`,
                 )
                 .style('left', e.pageX + 10 + 'px')
                 .style('top', e.pageY - 28 + 'px');
@@ -443,16 +506,19 @@
                 .duration(200)
                 .style('opacity', 0);
             });
+
           nodes
             .append('circle')
             .attr('r', (d) => radius(d.total))
             .attr('fill', (d) => color(d.r));
+
           const legend = svg
             .append('g')
             .attr(
               'transform',
               `translate(${width + margin.left - 20},${margin.top})`,
             );
+
           races.forEach((r, i) => {
             const row = legend
               .append('g')
@@ -484,6 +550,7 @@
           },
           width = 1000 - margin.left - margin.right,
           height = 500 - margin.top - margin.bottom;
+
         const svg = d3
           .select('#chart4')
           .append('svg')
@@ -497,7 +564,9 @@
             'transform',
             `translate(${margin.left},${margin.top})`,
           );
+
         const parse = d3.timeParse('%Y/%m/%d');
+
         d3.csv('PD-Investigated-Hate-Crimes.csv', (d) => ({
           date: parse(d.occurence_month),
           victims: +d.total_number_of_individual_victims,
@@ -507,19 +576,25 @@
             (v) => d3.sum(v, (d) => d.victims),
             (d) => d.date.getFullYear(),
           );
+
           let arr = rolled.map(([y, total]) => ({
             year: new Date(y, 0, 1),
-            total: total,
+            total,
           }));
           arr.sort((a, b) => a.year - b.year);
+
           const overall = d3.sum(arr, (d) => d.total);
+
           svg
             .append('text')
             .attr('x', width / 2)
             .attr('y', -20)
             .attr('text-anchor', 'middle')
-            .style('font-size', '20px')
-            .text('Number of Victims throughout the Years');
+            .style('font-size', '32px')
+            .text(
+              'Number of Victims throughout the Years (2001 – 2025)',
+            );
+
           svg
             .append('text')
             .attr('x', width / 2)
@@ -527,40 +602,48 @@
             .attr('text-anchor', 'middle')
             .style('font-size', '14px')
             .text(`Total Victims: ${overall}`);
+
           const x = d3
             .scaleTime()
             .domain(d3.extent(arr, (d) => d.year))
             .range([0, width]);
+
           const y = d3
             .scaleLinear()
             .domain([0, d3.max(arr, (d) => d.total)])
             .nice()
             .range([height, 0]);
+
           const area = d3
             .area()
             .x((d) => x(d.year))
             .y0(height)
             .y1((d) => y(d.total))
             .curve(d3.curveMonotoneX);
+
           svg
             .append('path')
             .datum(arr)
             .attr('fill', 'steelblue')
             .attr('opacity', 0.7)
             .attr('d', area);
+
           svg
             .append('g')
             .attr('transform', `translate(0,${height})`)
             .call(
               d3.axisBottom(x).ticks(d3.timeYear.every(1)),
             );
+
           svg.append('g').call(d3.axisLeft(y));
+
           svg
             .append('text')
             .attr('x', width / 2)
             .attr('y', height + margin.bottom - 10)
             .attr('text-anchor', 'middle')
             .text('Year');
+
           svg
             .append('text')
             .attr('transform', 'rotate(-90)')

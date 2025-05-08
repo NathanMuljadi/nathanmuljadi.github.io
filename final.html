@@ -15,7 +15,7 @@
         margin: 20px;
       }
       .axis text {
-        font-size: 12px;
+        font-size: 16px;
       }
       .axis path,
       .axis line {
@@ -96,7 +96,7 @@
             top: 50,
             right: 100,
             bottom: 80,
-            left: 200,
+            left: 240,
           },
           width = 1300 - margin.left - margin.right,
           height = 700 - margin.top - margin.bottom;
@@ -150,9 +150,13 @@
           svg
             .append('g')
             .attr('transform', `translate(0,${height})`)
+            .attr('class', 'axis')
             .call(d3.axisBottom(x));
 
-          svg.append('g').call(d3.axisLeft(y));
+          svg
+            .append('g')
+            .attr('class', 'axis')
+            .call(d3.axisLeft(y));
 
           svg
             .selectAll('.bar')
@@ -207,7 +211,7 @@
             .attr('x', width / 2)
             .attr('y', height + margin.bottom - 20)
             .attr('text-anchor', 'middle')
-            .style('font-size', '16px')
+            .style('font-size', '20px')
             .text('Total Number of Victims');
 
           svg
@@ -216,7 +220,7 @@
             .attr('x', -height / 2)
             .attr('y', -margin.left + 40)
             .attr('text-anchor', 'middle')
-            .style('font-size', '16px')
+            .style('font-size', '20px')
             .text('Suspect Race');
         });
       })();
@@ -386,20 +390,15 @@
 
         const tooltip = d3.select('#tooltip3');
 
-        // load and normalize
         d3.csv('PD-Investigated-Hate-Crimes.csv', (d) => {
-          // combine blank into 'Unknown'
           let raw = d.offensive_act.trim().toLowerCase();
           if (!raw) raw = 'unknown';
-          // title-case for display
           const act = raw
             .split(' ')
             .map(
               (w) => w.charAt(0).toUpperCase() + w.slice(1),
             )
             .join(' ');
-
-          // group certain races
           let race = d.suspects_race_as_a_group;
           if (
             [
@@ -410,14 +409,12 @@
           ) {
             race = 'Other';
           }
-
           return {
             act,
             race,
             total: +d.total_number_of_suspects,
           };
         }).then((data) => {
-          // nest act → race
           const nested = d3.rollups(
             data,
             (v) => d3.sum(v, (d) => d.total),
@@ -425,7 +422,6 @@
             (d) => d.race,
           );
 
-          // build hierarchy
           const rootData = {
             name: 'root',
             children: nested.map(([act, races]) => ({
@@ -444,15 +440,18 @@
 
           d3.pack().size([width, height]).padding(3)(root);
 
-          // color scale for acts
           const actNames = rootData.children.map(
             (d) => d.name,
           );
           const color = d3
-            .scaleOrdinal(d3.schemeTableau10)
-            .domain(actNames);
+            .scaleOrdinal()
+            .domain(actNames)
+            .range(
+              d3.schemeTableau10.map((c) =>
+                d3.color(c).brighter(1),
+              ),
+            );
 
-          // draw circles
           const node = chartGroup
             .selectAll('g')
             .data(root.descendants())
@@ -497,16 +496,20 @@
             .attr('stroke', '#333')
             .attr('stroke-width', 1);
 
-          // label only leaf nodes
           node
             .filter((d) => d.depth === 2)
             .append('text')
             .attr('dy', '0.3em')
             .style('font-size', '10px')
             .style('text-anchor', 'middle')
-            .text((d) => d.data.name);
+            .text((d) => d.data.name)
+            .each(function (d) {
+              const textWidth = this.getBBox().width;
+              if (textWidth > 2 * d.r) {
+                d3.select(this).remove();
+              }
+            });
 
-          // legend for acts
           const legend = svg
             .append('g')
             .attr(
@@ -547,7 +550,7 @@
             bottom: 50,
             left: 70,
           },
-          width = 1000 - margin.left - margin.right,
+          width = 1300 - margin.left - margin.right,
           height = 500 - margin.top - margin.bottom;
 
         const svg = d3
@@ -606,7 +609,6 @@
             .scaleTime()
             .domain(d3.extent(arr, (d) => d.year))
             .range([0, width]);
-
           const y = d3
             .scaleLinear()
             .domain([0, d3.max(arr, (d) => d.total)])
@@ -630,17 +632,22 @@
           svg
             .append('g')
             .attr('transform', `translate(0,${height})`)
+            .attr('class', 'axis')
             .call(
               d3.axisBottom(x).ticks(d3.timeYear.every(1)),
             );
 
-          svg.append('g').call(d3.axisLeft(y));
+          svg
+            .append('g')
+            .attr('class', 'axis')
+            .call(d3.axisLeft(y));
 
           svg
             .append('text')
             .attr('x', width / 2)
             .attr('y', height + margin.bottom - 10)
             .attr('text-anchor', 'middle')
+            .style('font-size', '20px')
             .text('Year');
 
           svg
@@ -649,6 +656,7 @@
             .attr('x', -height / 2)
             .attr('y', -margin.left + 15)
             .attr('text-anchor', 'middle')
+            .style('font-size', '20px')
             .text('Total Number of Victims');
         });
       })();
